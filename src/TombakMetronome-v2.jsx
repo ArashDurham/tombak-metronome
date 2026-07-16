@@ -392,7 +392,8 @@ export default function TombakRhythmBuilder() {
 
     function scheduler() {
       const ctx = audioCtxRef.current;
-      const spm = 60 / bpm; // seconds per measure (all measures have equal duration)
+      // bpm here controls measures per minute; spm = fixed duration for every measure
+      const spm = 60 / bpm; // seconds per measure
       const events = eventsRef.current;
       while (nextNoteTimeRef.current < ctx.currentTime + LOOKAHEAD) {
         const ev = events[eventIdxRef.current % events.length];
