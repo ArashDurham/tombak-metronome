@@ -96,94 +96,69 @@ function playKa(ctx, t, gainMul = 1) {
 
 function playStroke(ctx, type, t, accent) {
   const mul = accent ? 1.15 : 0.85;
+
   if (type === "tom") playTom(ctx, t, mul);
-  else if (type === "tak") playTak(ctx, t, mul);
-  else if (type === "ka") playKa(ctx, t, mul);
-  // 'rest' plays nothing
+
+  else if (type === "bak")
+    playTak(ctx, t, mul);
+
+  else if (type === "pelang")
+    playKa(ctx, t, mul * 1.2);
+
+  else if (type === "haft")
+    playKa(ctx, t, mul * 0.7);
 }
 
 // ---------- Pattern data model ----------
 // A pattern = array of "beats". Each beat = { subdivisions: n, strokes: [n items] }
-// Each stroke item: { type: 'tom'|'tak'|'ka'|'rest', accent: bool }
+// Each stroke item: { type: 'tom'|'bak'|'pelang'|'haft'|'rest', accent: bool }
 
-const STROKE_CYCLE = ["tom", "tak", "ka", "rest"];
-const STROKE_LABEL = { tom: "TOM", tak: "TAK", ka: "ka", rest: "·" };
+const STROKE_CYCLE = [
+  "tom",
+  "bak",
+  "pelang",
+  "haft",
+  "rest"
+];
+
+const STROKE_LABEL = {
+  tom: "TOM",
+  bak: "BAK",
+  pelang: "PELANG",
+  haft: "HAFT",
+  rest: "·"
+};
+
 const STROKE_COLOR = {
   tom: "#c2703a",
-  tak: "#e8d9b5",
-  ka: "#9ab6a6",
+  bak: "#e8d9b5",
+  pelang: "#8db8ff",
+  haft: "#9ab6a6",
   rest: "#3a332c",
 };
 
 function defaultStroke(idx) {
-  return { type: idx === 0 ? "tom" : "tak", accent: idx === 0 };
+  return { type: idx === 0 ? "tom" : "bak", accent: idx === 0 };
 }
 
-function makeBeat(subdivisions) {
+function makeMeasure(subdivisions) {
   return {
     subdivisions,
     strokes: Array.from({ length: subdivisions }, (_, i) => defaultStroke(i)),
   };
 }
 
-// Helper to build a beat with explicit stroke types
-function makeBeatFromStrokes(strokes) {
-  return {
-    subdivisions: strokes.length,
-    strokes: strokes.map(([type, accent = false]) => ({ type, accent })),
-  };
-}
+
 
 function defaultPattern() {
-  return rajabi6_8Pattern();
-}
-
-// Rajabi 6/8 pattern (two-measure cycle, each eighth = 1 beat slot)
-// Measure 1: Flam(Tom+Tak) | 4 sixteenths(Ka Tak Ka Tom) over 2 eighth slots
-//            | Tom(eighth) | Ka(eighth) | rest
-// We model as 6 slots (eighths). The 4 sixteenths occupy slots 2+3 as a
-// single beat of 4 subdivisions (2 slots compressed into 1 beat of double duration
-// is not possible with current model, so we split: slot2=Ka,Tak / slot3=Ka,Tom)
-// Measure 2: Flam | muted-Tak rest | muted-Tak rest | muted-Tak rest
-// "muted Tak" = Tak with softer accent; we use ka as closest available timbre
-function rajabi6_8Pattern() {
   return [
-    // ── Measure 1 ──
-    // Slot 1: Flam — Tom (accented) + immediate Tak played as 2 very fast subdivisions
-    makeBeatFromStrokes([["tom", true], ["tak", false]]),
-    // Slots 2–3: 4 sixteenth notes spanning 2 eighth-note durations
-    // Each slot = 2 sixteenths
-    makeBeatFromStrokes([["ka", false], ["tak", false]]),
-    makeBeatFromStrokes([["ka", false], ["tom", true]]),
-    // Slot 4: single eighth — Tom
-    makeBeatFromStrokes([["tom", false]]),
-    // Slot 5: single eighth — Ka
-    makeBeatFromStrokes([["ka", false]]),
-    // Slot 6: rest
-    makeBeatFromStrokes([["rest", false]]),
-
-    // ── Measure 2 ──
-    // Slot 1: Flam again
-    makeBeatFromStrokes([["tom", true], ["tak", false]]),
-    // Slots 2–3: muted Tak + eighth rest (model rest as 2nd subdivision)
-    makeBeatFromStrokes([["tak", true], ["rest", false]]),
-    // Slot 4: muted Tak + rest
-    makeBeatFromStrokes([["tak", true], ["rest", false]]),
-    // Slot 5: muted Tak + rest
-    makeBeatFromStrokes([["tak", true], ["rest", false]]),
-    // Slot 6: rest
-    makeBeatFromStrokes([["rest", false]]),
-    makeBeatFromStrokes([["rest", false]]),
+    makeMeasure(4),
+    makeMeasure(4),
+    makeMeasure(4),
+    makeMeasure(4),
   ];
 }
 
-const PRESETS = {
-  "Rajabi 6/8": () => rajabi6_8Pattern(),
-  "1 · 23 · 1234": () => [makeBeat(1), makeBeat(2), makeBeat(4)],
-  "Simple 4/4": () => [makeBeat(1), makeBeat(1), makeBeat(1), makeBeat(1)],
-  "6/8 Baseline": () => [makeBeat(3), makeBeat(3)],
-  "Triplet feel": () => [makeBeat(3), makeBeat(3), makeBeat(3), makeBeat(3)],
-};
 
 // ---------- Main component ----------
 export default function TombakMetronome() {
@@ -192,14 +167,13 @@ export default function TombakMetronome() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(-1);
   const [currentSub, setCurrentSub] = useState(-1);
-  const [volume, setVolume] = useState(0.9);
+
   const [accentDownbeats, setAccentDownbeats] = useState(true);
 
   const audioCtxRef = useRef(null);
   const schedulerRef = useRef(null);
   const nextNoteTimeRef = useRef(0);
   const noteQueueRef = useRef([]); // for visual sync
-  const eventListRef = useRef([]); // flattened schedule for current pattern
   const eventIdxRef = useRef(0);
   const rafRef = useRef(null);
   const isPlayingRef = useRef(false);
@@ -311,12 +285,6 @@ export default function TombakMetronome() {
     rafRef.current = requestAnimationFrame(visualLoop);
   }, [bpm, accentDownbeats]);
 
-  useEffect(() => {
-    // apply volume to a master gain — simplified: we don't have a persistent
-    // master gain node since each play* call connects directly; instead
-    // we scale via gainMul passed into playStroke through accent flag's mul.
-    // Implement true master volume by wrapping ctx.destination via a GainNode.
-  }, [volume]);
 
   useEffect(() => {
     return () => {
@@ -332,10 +300,10 @@ export default function TombakMetronome() {
   }
 
   // ---------- Pattern editing ----------
-  function addBeat() {
-    setPattern((p) => [...p, makeBeat(1)]);
-  }
-  function removeBeat(idx) {
+function addMeasure() {
+  setPattern((p) => [...p, makeMeasure(4)]);
+}
+  function removeMeasure(idx) {
     setPattern((p) => p.filter((_, i) => i !== idx));
   }
   function setSubdivisions(beatIdx, n) {
@@ -374,10 +342,7 @@ export default function TombakMetronome() {
       })
     );
   }
-  function loadPreset(name) {
-    stop();
-    setPattern(PRESETS[name]());
-  }
+
 
   // ---------- Render ----------
   return (
@@ -437,7 +402,7 @@ export default function TombakMetronome() {
               marginBottom: 6,
             }}
           >
-            Tombak Cycle Engine
+            Tombak Rhythm Builder
           </div>
           <h1
             style={{
@@ -450,11 +415,10 @@ export default function TombakMetronome() {
           >
             تنبک &nbsp;Metronome
           </h1>
-          <p style={{ color: "#8a7660", fontSize: 14, marginTop: 8 }}>
-            Build a cycle of main beats, give each beat its own subdivision
-            count, and assign Tom / Tak / Ka to every stroke — quartolets
-            inside a 6/8 and all.
-          </p>
+<p style={{ color: "#8a7660", fontSize: 14, marginTop: 8 }}>
+  Create custom Tombak exercises using
+  Tom, Bak, Pelang, and Haft strokes.
+</p>
         </header>
 
         {/* Transport */}
@@ -509,18 +473,34 @@ export default function TombakMetronome() {
               >
                 –
               </button>
-              <div
-                style={{
-                  fontSize: 30,
-                  fontWeight: 700,
-                  width: 70,
-                  textAlign: "center",
-                  color: "#f3e6c8",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {bpm}
-              </div>
+<input
+  type="number"
+  min="30"
+  max="300"
+  value={bpm}
+  onChange={(e) =>
+    setBpm(
+      Math.max(
+        30,
+        Math.min(
+          300,
+          Number(e.target.value) || 30
+        )
+      )
+    )
+  }
+  style={{
+    width: 80,
+    textAlign: "center",
+    fontSize: 26,
+    fontWeight: 700,
+    background: "#201810",
+    color: "#f3e6c8",
+    border: "1px solid #4a3c2c",
+    borderRadius: 8,
+    padding: "4px",
+  }}
+/>
               <button
                 onClick={() => setBpm((b) => Math.min(280, b + 2))}
                 style={iconBtnStyle}
@@ -533,27 +513,7 @@ export default function TombakMetronome() {
             </div>
           </div>
 
-          <div style={{ textAlign: "center", minWidth: 140 }}>
-            <div
-              style={{
-                fontSize: 12,
-                letterSpacing: "0.12em",
-                color: "#a3895f",
-                marginBottom: 4,
-              }}
-            >
-              VOLUME
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
-              style={{ width: 130 }}
-            />
-          </div>
+
 
           <label
             style={{
@@ -574,34 +534,7 @@ export default function TombakMetronome() {
           </label>
         </div>
 
-        {/* Presets */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            justifyContent: "center",
-            marginBottom: 30,
-            flexWrap: "wrap",
-          }}
-        >
-          {Object.keys(PRESETS).map((name) => (
-            <button
-              key={name}
-              onClick={() => loadPreset(name)}
-              style={{
-                background: "transparent",
-                border: "1px solid #4a3c2c",
-                color: "#c9b896",
-                fontSize: 12,
-                padding: "6px 12px",
-                borderRadius: 20,
-                cursor: "pointer",
-              }}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+
 
         {/* Pattern editor */}
         <div
@@ -651,22 +584,23 @@ export default function TombakMetronome() {
                     color: "#a3895f",
                   }}
                 >
-                  ♩{bIdx + 1}
+                  Measure {bIdx + 1}
                 </span>
-                <button
-                  onClick={() => removeBeat(bIdx)}
-                  disabled={pattern.length <= 1}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#766350",
-                    cursor: pattern.length > 1 ? "pointer" : "default",
-                    fontSize: 14,
-                  }}
-                  title="Remove beat"
-                >
-                  ✕
-                </button>
+{pattern.length > 4 && (
+  <button
+    onClick={() => removeMeasure(bIdx)}
+    style={{
+      background: "none",
+      border: "none",
+      color: "#766350",
+      cursor: "pointer",
+      fontSize: 14,
+    }}
+    title="Remove Measure"
+  >
+    ✕
+  </button>
+)}
               </div>
 
               {/* subdivision count stepper */}
@@ -704,9 +638,9 @@ export default function TombakMetronome() {
                 >
                   +
                 </button>
-                <span style={{ fontSize: 11, color: "#766350" }}>
-                  notes here
-                </span>
+<span style={{ fontSize: 11, color: "#766350" }}>
+  subdivisions
+</span>
               </div>
 
               {/* stroke cells */}
@@ -744,7 +678,7 @@ export default function TombakMetronome() {
                             st.type === "rest"
                               ? "#241c14"
                               : STROKE_COLOR[st.type],
-                          color: st.type === "tak" ? "#241c14" : "#1a1108",
+                          color: st.type === "bak" ? "#241c14" : "#1a1108",
                           fontSize: 10,
                           fontWeight: 800,
                           letterSpacing: "0.03em",
@@ -779,59 +713,27 @@ export default function TombakMetronome() {
             </div>
           ))}
 
-          <button
-            onClick={addBeat}
-            style={{
-              flex: "0 0 auto",
-              minWidth: 60,
-              border: "1px dashed #4a3c2c",
-              borderRadius: 14,
-              background: "transparent",
-              color: "#a3895f",
-              fontSize: 24,
-              cursor: "pointer",
-            }}
-            title="Add a beat"
-          >
-            +
-          </button>
+<button
+  onClick={addMeasure}
+  style={{
+    flex: "0 0 auto",
+    minWidth: 140,
+    border: "1px dashed #4a3c2c",
+    borderRadius: 14,
+    background: "transparent",
+    color: "#a3895f",
+    fontSize: 18,
+    cursor: "pointer",
+    padding: "12px",
+  }}
+  title="Add Measure"
+>
+  + Measure
+</button>
+
         </div>
 
-        {/* Legend / instructions */}
-        <div
-          style={{
-            marginTop: 24,
-            fontSize: 13,
-            color: "#8a7660",
-            lineHeight: 1.7,
-          }}
-        >
-          <p style={{ margin: "0 0 8px" }}>
-            <strong style={{ color: "#c9b896" }}>Default pattern:</strong> the
-            Bahman Rajabi 6/8 two-measure cycle from your score. Each card is
-            one eighth-note slot. A beat with 2 subdivisions plays both notes
-            in the time of one eighth — so the opening flam (Tom + Tak rapid
-            pair) fits naturally. The four sixteenth-notes in M1 are split
-            across two slots of 2 each (Ka·Tak then Ka·Tom). Measure 2's three
-            muted Taks each have a built-in rest as their second subdivision.
-          </p>
-          <p style={{ margin: "0 0 8px" }}>
-            <strong style={{ color: "#c9b896" }}>How beats work:</strong> every
-            slot keeps the same clock duration (one eighth at your tempo)
-            regardless of how many subdivisions you pack in — so 4 subdivisions
-            play at sixteenth speed, 3 at triplet speed, etc. This is how a
-            quartolet fits inside a triplet's space.
-          </p>
-          <p style={{ margin: 0 }}>
-            <strong style={{ color: "#c9b896" }}>Editing:</strong>{" "}
-            click a cell to cycle{" "}
-            <span style={{ color: STROKE_COLOR.tom }}>TOM</span> →{" "}
-            <span style={{ color: STROKE_COLOR.tak }}>TAK</span> →{" "}
-            <span style={{ color: STROKE_COLOR.ka }}>ka</span> → rest.
-            Double-click to toggle accent. Use + / – on each card to change
-            subdivision count.
-          </p>
-        </div>
+
       </div>
     </div>
   );
@@ -860,4 +762,3 @@ const iconBtnSmall = {
   cursor: "pointer",
   lineHeight: "1",
 };
-
