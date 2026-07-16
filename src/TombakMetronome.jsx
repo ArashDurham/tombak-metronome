@@ -164,11 +164,15 @@ function defaultPattern() {
 export default function TombakMetronome() {
   const [pattern, setPattern] = useState(defaultPattern());
   const [bpm, setBpm] = useState(80);
+  const [bpmInput, setBpmInput] = useState("80");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(-1);
   const [currentSub, setCurrentSub] = useState(-1);
 
   const [accentDownbeats, setAccentDownbeats] = useState(true);
+
+  // Keep the raw input string in sync when bpm is changed via arrow controls
+  useEffect(() => { setBpmInput(String(bpm)); }, [bpm]);
 
   const audioCtxRef = useRef(null);
   const schedulerRef = useRef(null);
@@ -477,18 +481,13 @@ function addMeasure() {
   type="number"
   min="20"
   max="400"
-  value={bpm}
-  onChange={(e) =>
-    setBpm(
-      Math.max(
-        20,
-        Math.min(
-          400,
-          Number(e.target.value) || 20
-        )
-      )
-    )
-  }
+  value={bpmInput}
+  onChange={(e) => setBpmInput(e.target.value)}
+  onBlur={(e) => {
+    const clamped = Math.max(20, Math.min(400, Number(e.target.value) || 20));
+    setBpm(clamped);
+    setBpmInput(String(clamped));
+  }}
   style={{
     width: 80,
     textAlign: "center",
