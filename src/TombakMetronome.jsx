@@ -468,23 +468,23 @@ function addMeasure() {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button
-                onClick={() => setBpm((b) => Math.max(30, b - 2))}
+                onClick={() => setBpm((b) => Math.max(20, b - 1))}
                 style={iconBtnStyle}
               >
                 –
               </button>
 <input
   type="number"
-  min="30"
-  max="300"
+  min="20"
+  max="400"
   value={bpm}
   onChange={(e) =>
     setBpm(
       Math.max(
-        30,
+        20,
         Math.min(
-          300,
-          Number(e.target.value) || 30
+          400,
+          Number(e.target.value) || 20
         )
       )
     )
@@ -502,7 +502,7 @@ function addMeasure() {
   }}
 />
               <button
-                onClick={() => setBpm((b) => Math.min(280, b + 2))}
+                onClick={() => setBpm((b) => Math.min(400, b + 1))}
                 style={iconBtnStyle}
               >
                 +

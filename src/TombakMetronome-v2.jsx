@@ -506,11 +506,11 @@ export default function TombakRhythmBuilder() {
         <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
           {/* BPM */}
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-            <button onClick={() => setBpm(b=>Math.max(30,b-5))} style={tinyBtn}>–</button>
+            <button onClick={() => setBpm(b=>Math.max(20,b-1))} style={tinyBtn}>–</button>
             <div style={{ textAlign:"center" }}>
               <input
-                type="number" min="30" max="320" value={bpm}
-                onChange={e => setBpm(Math.max(30, Math.min(320, Number(e.target.value)||30)))}
+                type="number" min="20" max="400" value={bpm}
+                onChange={e => setBpm(Math.max(20, Math.min(400, Number(e.target.value)||20)))}
                 style={{
                   width:62, textAlign:"center", fontSize:22, fontWeight:800,
                   background:"#1a1008", color:"#f0e0c0",
@@ -520,7 +520,7 @@ export default function TombakRhythmBuilder() {
               />
               <div style={{ fontSize:9, color:"#5a4028", letterSpacing:"0.12em" }}>BPM</div>
             </div>
-            <button onClick={() => setBpm(b=>Math.min(320,b+5))} style={tinyBtn}>+</button>
+            <button onClick={() => setBpm(b=>Math.min(400,b+1))} style={tinyBtn}>+</button>
           </div>
 
           {/* Play / Stop */}
