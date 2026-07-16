@@ -345,6 +345,7 @@ function MeasureCard({ measure, mIdx, activeMeasure, activeBeat, activeSub, isPl
 export default function TombakRhythmBuilder() {
   const [cycle, setCycle] = useState(defaultCycle());
   const [bpm, setBpm] = useState(80);
+  const [bpmInput, setBpmInput] = useState("80");
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeMeasure, setActiveMeasure] = useState(-1);
   const [activeBeat, setActiveBeat] = useState(-1);
@@ -361,6 +362,9 @@ export default function TombakRhythmBuilder() {
   const eventsRef = useRef(buildEventList(cycle));
 
   useEffect(() => { eventsRef.current = buildEventList(cycle); }, [cycle]);
+
+  // Keep the raw input string in sync when bpm is changed via arrow controls
+  useEffect(() => { setBpmInput(String(bpm)); }, [bpm]);
 
   const stop = useCallback(() => {
     isPlayingRef.current = false;
@@ -509,8 +513,13 @@ export default function TombakRhythmBuilder() {
             <button onClick={() => setBpm(b=>Math.max(20,b-1))} style={tinyBtn}>–</button>
             <div style={{ textAlign:"center" }}>
               <input
-                type="number" min="20" max="400" value={bpm}
-                onChange={e => setBpm(Math.max(20, Math.min(400, Number(e.target.value)||20)))}
+                type="number" min="20" max="400" value={bpmInput}
+                onChange={e => setBpmInput(e.target.value)}
+                onBlur={e => {
+                  const clamped = Math.max(20, Math.min(400, Number(e.target.value) || 20));
+                  setBpm(clamped);
+                  setBpmInput(String(clamped));
+                }}
                 style={{
                   width:62, textAlign:"center", fontSize:22, fontWeight:800,
                   background:"#1a1008", color:"#f0e0c0",
