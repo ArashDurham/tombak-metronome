@@ -125,10 +125,12 @@ function defaultCycle() {
 function buildEventList(cycle) {
   const events = [];
   cycle.forEach((measure, mIdx) => {
+    const numBeats = measure.beats.length;
     measure.beats.forEach((beat, bIdx) => {
       const subs = beat.subdivisions;
       beat.strokes.forEach((stroke, sIdx) => {
-        events.push({ mIdx, bIdx, sIdx, stroke, fracOfBeat: 1/subs });
+        // Each event occupies 1/(numBeats * subs) of the total measure duration
+        events.push({ mIdx, bIdx, sIdx, stroke, fracOfMeasure: 1 / (numBeats * subs) });
       });
     });
   });
@@ -390,7 +392,8 @@ export default function TombakRhythmBuilder() {
 
     function scheduler() {
       const ctx = audioCtxRef.current;
-      const spb = 60 / bpm; // seconds per beat
+      // bpm here controls measures per minute; spm = fixed duration for every measure
+      const spm = 60 / bpm; // seconds per measure
       const events = eventsRef.current;
       while (nextNoteTimeRef.current < ctx.currentTime + LOOKAHEAD) {
         const ev = events[eventIdxRef.current % events.length];
@@ -399,7 +402,7 @@ export default function TombakRhythmBuilder() {
         const accent = ev.stroke.accent || (accentDownbeats && isDown);
         playStroke(ctx, ev.stroke.type, t, accent);
         noteQueueRef.current.push({ time: t, mIdx: ev.mIdx, bIdx: ev.bIdx, sIdx: ev.sIdx });
-        nextNoteTimeRef.current += spb * ev.fracOfBeat;
+        nextNoteTimeRef.current += spm * ev.fracOfMeasure;
         eventIdxRef.current++;
       }
     }
@@ -625,7 +628,8 @@ export default function TombakRhythmBuilder() {
           border:"1px solid #1e1208",
           fontSize:12, color:"#6a5038", lineHeight:1.8,
         }}>
-          <strong style={{ color:"#9a7848" }}>How it works:</strong> Every beat occupies the same clock time within its measure.
+          <strong style={{ color:"#9a7848" }}>How it works:</strong> Every measure lasts the same total duration regardless of how many beats it contains.
+          Beats are evenly spaced within a measure, so adding more beats makes them faster.
           Pack more subdivisions into a beat and they play proportionally faster —
           4 subdivisions in one beat vs 3 in the next creates a quartolet against a triplet, exactly as in Tombak notation.
           Choose a time signature per measure, and for Persian meters like 7/8, pick a beat grouping (e.g. 2+2+3 vs 3+2+2)
