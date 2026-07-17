@@ -605,7 +605,7 @@ export default function TombakRhythmBuilder() {
             onSetSubs={setSubdivisions}
             onCycleStroke={cycleStroke}
             onToggleAccent={toggleAccent}
-            canRemove={cycle.length > 4}
+            canRemove={cycle.length > 1}
             onRemoveMeasure={() => removeMeasure(mIdx)}
           />
         ))}
