@@ -181,6 +181,13 @@ function saveRhythmState({ cycle, bpm, accentDownbeats }) {
   } catch {}
 }
 
+let initialRhythmStateCache = null;
+function getInitialRhythmState() {
+  if (initialRhythmStateCache !== null) return initialRhythmStateCache;
+  initialRhythmStateCache = readSavedRhythmState();
+  return initialRhythmStateCache;
+}
+
 // Flatten cycle → event list for scheduler
 function buildEventList(cycle) {
   const events = [];
@@ -405,18 +412,14 @@ function MeasureCard({ measure, mIdx, activeMeasure, activeBeat, activeSub, isPl
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function TombakRhythmBuilder() {
-  const initialSavedStateRef = useRef(null);
-  if (initialSavedStateRef.current === null) initialSavedStateRef.current = readSavedRhythmState();
-  const initialSavedState = initialSavedStateRef.current;
-
-  const [cycle, setCycle] = useState(initialSavedState.cycle);
-  const [bpm, setBpm] = useState(initialSavedState.bpm);
-  const [bpmInput, setBpmInput] = useState(String(initialSavedState.bpm));
+  const [cycle, setCycle] = useState(() => getInitialRhythmState().cycle);
+  const [bpm, setBpm] = useState(() => getInitialRhythmState().bpm);
+  const [bpmInput, setBpmInput] = useState(() => String(getInitialRhythmState().bpm));
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeMeasure, setActiveMeasure] = useState(-1);
   const [activeBeat, setActiveBeat] = useState(-1);
   const [activeSub, setActiveSub] = useState(-1);
-  const [accentDownbeats, setAccentDownbeats] = useState(initialSavedState.accentDownbeats);
+  const [accentDownbeats, setAccentDownbeats] = useState(() => getInitialRhythmState().accentDownbeats);
 
   const audioCtxRef = useRef(null);
   const schedulerRef = useRef(null);
@@ -431,7 +434,12 @@ export default function TombakRhythmBuilder() {
 
   // Keep the raw input string in sync when bpm is changed via arrow controls
   useEffect(() => { setBpmInput(String(bpm)); }, [bpm]);
-  useEffect(() => { saveRhythmState({ cycle, bpm, accentDownbeats }); }, [cycle, bpm, accentDownbeats]);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      saveRhythmState({ cycle, bpm, accentDownbeats });
+    }, 150);
+    return () => clearTimeout(timeoutId);
+  }, [cycle, bpm, accentDownbeats]);
 
   const stop = useCallback(() => {
     isPlayingRef.current = false;
