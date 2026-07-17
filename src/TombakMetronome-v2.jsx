@@ -107,6 +107,8 @@ const TIME_SIGS = {
 const LOCAL_STORAGE_KEY = "tombak-metronome:last-rhythm-v1";
 const PERSISTENCE_DEBOUNCE_MS = 150;
 const DEFAULT_STROKE_TYPE = "tom";
+const DEFAULT_BPM = 80;
+const DEFAULT_ACCENT_DOWNBEATS = true;
 
 function makeStroke(type=DEFAULT_STROKE_TYPE, accent=false) { return { type, accent }; }
 function makeBeat(subs=1) {
@@ -121,7 +123,7 @@ function makeMeasure(timeSig="4/4", groupIdx=0) {
   };
 }
 function defaultCycle() {
-  return [makeMeasure("4/4"), makeMeasure("4/4"), makeMeasure("4/4"), makeMeasure("4/4")];
+  return [makeMeasure("4/4"), makeMeasure("4/4")];
 }
 
 function clampInt(value, min, max, fallback) {
@@ -160,7 +162,7 @@ function normalizeCycle(rawCycle) {
 }
 
 function readSavedRhythmState() {
-  const fallback = { cycle: defaultCycle(), bpm: 80, accentDownbeats: true };
+  const fallback = { cycle: defaultCycle(), bpm: DEFAULT_BPM, accentDownbeats: DEFAULT_ACCENT_DOWNBEATS };
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -168,8 +170,8 @@ function readSavedRhythmState() {
     const parsed = JSON.parse(raw);
     return {
       cycle: normalizeCycle(parsed?.cycle),
-      bpm: clampInt(parsed?.bpm, 20, 400, 80),
-      accentDownbeats: typeof parsed?.accentDownbeats === "boolean" ? parsed.accentDownbeats : true,
+      bpm: clampInt(parsed?.bpm, 20, 400, DEFAULT_BPM),
+      accentDownbeats: typeof parsed?.accentDownbeats === "boolean" ? parsed.accentDownbeats : DEFAULT_ACCENT_DOWNBEATS,
     };
   } catch {
     return fallback;
@@ -553,6 +555,18 @@ export default function TombakRhythmBuilder() {
     return { ...m, beats };
   }));
 
+  const resetToDefault = useCallback(() => {
+    stop();
+    const newCycle = defaultCycle();
+    setCycle(newCycle);
+    setBpm(DEFAULT_BPM);
+    setBpmInput(String(DEFAULT_BPM));
+    setAccentDownbeats(DEFAULT_ACCENT_DOWNBEATS);
+    const payload = JSON.stringify({ cycle: newCycle, bpm: DEFAULT_BPM, accentDownbeats: DEFAULT_ACCENT_DOWNBEATS });
+    lastSavedPayloadRef.current = payload;
+    saveRhythmState(payload);
+  }, [stop]);
+
   // ── Render ──
   return (
     <div style={{
@@ -638,6 +652,20 @@ export default function TombakRhythmBuilder() {
             />
             Auto-accent<br/>downbeats
           </label>
+
+          {/* Reset to Default */}
+          <button
+            onClick={resetToDefault}
+            title="Reset to default pattern"
+            style={{
+              padding:"6px 14px", borderRadius:20,
+              border:"1px solid #4a2e18", background:"transparent",
+              color:"#8a6040", fontSize:11, cursor:"pointer",
+              fontFamily:"inherit", letterSpacing:"0.08em",
+            }}
+          >
+            Reset to Default
+          </button>
         </div>
       </div>
 
