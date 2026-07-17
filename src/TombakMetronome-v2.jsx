@@ -104,7 +104,7 @@ const TIME_SIGS = {
   "10/8":{ beats:10, groups: [[3,3,2,2],[3,2,3,2],[2,3,3,2]] },
   "12/8":{ beats:12, groups: [[3,3,3,3]] },
 };
-const LOCAL_STORAGE_KEY = "tombak-rhythm-builder:last-rhythm-v1";
+const LOCAL_STORAGE_KEY = "tombak-metronome:last-rhythm-v1";
 const PERSISTENCE_DEBOUNCE_MS = 150;
 const DEFAULT_STROKE_TYPE = "tom";
 
@@ -437,6 +437,7 @@ export default function TombakRhythmBuilder() {
       const payload = JSON.stringify({ cycle, bpm, accentDownbeats });
       if (lastSavedPayloadRef.current === null) {
         lastSavedPayloadRef.current = payload;
+        saveRhythmState(payload);
         return;
       }
       if (payload === lastSavedPayloadRef.current) return;
