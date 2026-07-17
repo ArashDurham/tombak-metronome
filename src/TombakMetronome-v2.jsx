@@ -105,6 +105,7 @@ const TIME_SIGS = {
   "12/8":{ beats:12, groups: [[3,3,3,3]] },
 };
 const PERSISTENCE_KEY = "tombak-rhythm-builder:last-rhythm-v1";
+const PERSISTENCE_DEBOUNCE_MS = 150;
 
 function makeStroke(type="tom", accent=false) { return { type, accent }; }
 function makeBeat(subs=1) {
@@ -412,14 +413,16 @@ function MeasureCard({ measure, mIdx, activeMeasure, activeBeat, activeSub, isPl
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function TombakRhythmBuilder() {
-  const [cycle, setCycle] = useState(() => getInitialRhythmState().cycle);
-  const [bpm, setBpm] = useState(() => getInitialRhythmState().bpm);
-  const [bpmInput, setBpmInput] = useState(() => String(getInitialRhythmState().bpm));
+  const initialRhythmState = getInitialRhythmState();
+
+  const [cycle, setCycle] = useState(() => initialRhythmState.cycle);
+  const [bpm, setBpm] = useState(() => initialRhythmState.bpm);
+  const [bpmInput, setBpmInput] = useState(() => String(initialRhythmState.bpm));
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeMeasure, setActiveMeasure] = useState(-1);
   const [activeBeat, setActiveBeat] = useState(-1);
   const [activeSub, setActiveSub] = useState(-1);
-  const [accentDownbeats, setAccentDownbeats] = useState(() => getInitialRhythmState().accentDownbeats);
+  const [accentDownbeats, setAccentDownbeats] = useState(() => initialRhythmState.accentDownbeats);
 
   const audioCtxRef = useRef(null);
   const schedulerRef = useRef(null);
@@ -437,7 +440,7 @@ export default function TombakRhythmBuilder() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       saveRhythmState({ cycle, bpm, accentDownbeats });
-    }, 150);
+    }, PERSISTENCE_DEBOUNCE_MS);
     return () => clearTimeout(timeoutId);
   }, [cycle, bpm, accentDownbeats]);
 
