@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 // ─────────────────────────────────────────────
 // AUDIO ENGINE
@@ -104,10 +104,13 @@ const TIME_SIGS = {
   "10/8":{ beats:10, groups: [[3,3,2,2],[3,2,3,2],[2,3,3,2]] },
   "12/8":{ beats:12, groups: [[3,3,3,3]] },
 };
+const LOCAL_STORAGE_KEY = "tombak-metronome:last-rhythm-v1";
+const PERSISTENCE_DEBOUNCE_MS = 150;
+const DEFAULT_STROKE_TYPE = "tom";
 
-function makeStroke(type="tom", accent=false) { return { type, accent }; }
+function makeStroke(type=DEFAULT_STROKE_TYPE, accent=false) { return { type, accent }; }
 function makeBeat(subs=1) {
-  return { subdivisions: subs, strokes: Array.from({length:subs}, () => makeStroke("tom")) };
+  return { subdivisions: subs, strokes: Array.from({length:subs}, () => makeStroke(DEFAULT_STROKE_TYPE)) };
 }
 function makeMeasure(timeSig="4/4", groupIdx=0) {
   const { beats } = TIME_SIGS[timeSig];
@@ -119,6 +122,65 @@ function makeMeasure(timeSig="4/4", groupIdx=0) {
 }
 function defaultCycle() {
   return [makeMeasure("4/4"), makeMeasure("4/4"), makeMeasure("4/4"), makeMeasure("4/4")];
+}
+
+function clampInt(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  const rounded = Math.round(num);
+  return Math.max(min, Math.min(max, rounded));
+}
+
+function normalizeStroke(rawStroke) {
+  const type = STROKE_CYCLE.includes(rawStroke?.type) ? rawStroke.type : DEFAULT_STROKE_TYPE;
+  return { type, accent: Boolean(rawStroke?.accent) };
+}
+
+function normalizeBeat(rawBeat) {
+  const subdivisions = clampInt(rawBeat?.subdivisions, 1, 12, 1);
+  const rawStrokes = Array.isArray(rawBeat?.strokes) ? rawBeat.strokes : [];
+  const strokes = Array.from({ length: subdivisions }, (_, sIdx) => normalizeStroke(rawStrokes[sIdx]));
+  return { subdivisions, strokes };
+}
+
+function normalizeMeasure(rawMeasure) {
+  const timeSig = rawMeasure?.timeSig in TIME_SIGS ? rawMeasure.timeSig : "4/4";
+  const maxGroupIdx = TIME_SIGS[timeSig].groups.length - 1;
+  const groupIdx = clampInt(rawMeasure?.groupIdx, 0, maxGroupIdx, 0);
+  const rawBeats = Array.isArray(rawMeasure?.beats) ? rawMeasure.beats : [];
+  const beats = rawBeats.length > 0
+    ? rawBeats.map(normalizeBeat)
+    : Array.from({ length: TIME_SIGS[timeSig].beats }, () => makeBeat(1));
+  return { timeSig, groupIdx, beats };
+}
+
+function normalizeCycle(rawCycle) {
+  if (!Array.isArray(rawCycle) || rawCycle.length === 0) return defaultCycle();
+  return rawCycle.map(normalizeMeasure);
+}
+
+function readSavedRhythmState() {
+  const fallback = { cycle: defaultCycle(), bpm: 80, accentDownbeats: true };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return {
+      cycle: normalizeCycle(parsed?.cycle),
+      bpm: clampInt(parsed?.bpm, 20, 400, 80),
+      accentDownbeats: typeof parsed?.accentDownbeats === "boolean" ? parsed.accentDownbeats : true,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveRhythmState(serializedState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, serializedState);
+  } catch {}
 }
 
 // Flatten cycle → event list for scheduler
@@ -345,14 +407,16 @@ function MeasureCard({ measure, mIdx, activeMeasure, activeBeat, activeSub, isPl
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function TombakRhythmBuilder() {
-  const [cycle, setCycle] = useState(defaultCycle());
-  const [bpm, setBpm] = useState(80);
-  const [bpmInput, setBpmInput] = useState("80");
+  const initialRhythmState = useMemo(() => readSavedRhythmState(), []);
+
+  const [cycle, setCycle] = useState(() => initialRhythmState.cycle);
+  const [bpm, setBpm] = useState(() => initialRhythmState.bpm);
+  const [bpmInput, setBpmInput] = useState(() => String(initialRhythmState.bpm));
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeMeasure, setActiveMeasure] = useState(-1);
   const [activeBeat, setActiveBeat] = useState(-1);
   const [activeSub, setActiveSub] = useState(-1);
-  const [accentDownbeats, setAccentDownbeats] = useState(true);
+  const [accentDownbeats, setAccentDownbeats] = useState(() => initialRhythmState.accentDownbeats);
 
   const audioCtxRef = useRef(null);
   const schedulerRef = useRef(null);
@@ -361,12 +425,27 @@ export default function TombakRhythmBuilder() {
   const eventIdxRef = useRef(0);
   const rafRef = useRef(null);
   const isPlayingRef = useRef(false);
+  const lastSavedPayloadRef = useRef(null);
   const eventsRef = useRef(buildEventList(cycle));
 
   useEffect(() => { eventsRef.current = buildEventList(cycle); }, [cycle]);
 
   // Keep the raw input string in sync when bpm is changed via arrow controls
   useEffect(() => { setBpmInput(String(bpm)); }, [bpm]);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const payload = JSON.stringify({ cycle, bpm, accentDownbeats });
+      if (lastSavedPayloadRef.current === null) {
+        lastSavedPayloadRef.current = payload;
+        saveRhythmState(payload);
+        return;
+      }
+      if (payload === lastSavedPayloadRef.current) return;
+      lastSavedPayloadRef.current = payload;
+      saveRhythmState(payload);
+    }, PERSISTENCE_DEBOUNCE_MS);
+    return () => clearTimeout(timeoutId);
+  }, [cycle, bpm, accentDownbeats]);
 
   const stop = useCallback(() => {
     isPlayingRef.current = false;
