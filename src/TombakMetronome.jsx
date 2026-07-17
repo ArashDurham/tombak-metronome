@@ -585,7 +585,7 @@ function addMeasure() {
                 >
                   Measure {bIdx + 1}
                 </span>
-{pattern.length > 4 && (
+{pattern.length > 1 && (
   <button
     onClick={() => removeMeasure(bIdx)}
     style={{
