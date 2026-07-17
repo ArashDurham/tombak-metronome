@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 // ─────────────────────────────────────────────
 // AUDIO ENGINE
@@ -175,18 +175,11 @@ function readSavedRhythmState() {
   }
 }
 
-function saveRhythmState({ cycle, bpm, accentDownbeats }) {
+function saveRhythmState(serializedState) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(PERSISTENCE_KEY, JSON.stringify({ cycle, bpm, accentDownbeats }));
+    window.localStorage.setItem(PERSISTENCE_KEY, serializedState);
   } catch {}
-}
-
-let initialRhythmStateCache = null;
-function getInitialRhythmState() {
-  if (initialRhythmStateCache !== null) return initialRhythmStateCache;
-  initialRhythmStateCache = readSavedRhythmState();
-  return initialRhythmStateCache;
 }
 
 // Flatten cycle → event list for scheduler
@@ -413,7 +406,7 @@ function MeasureCard({ measure, mIdx, activeMeasure, activeBeat, activeSub, isPl
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function TombakRhythmBuilder() {
-  const initialRhythmState = getInitialRhythmState();
+  const initialRhythmState = useMemo(() => readSavedRhythmState(), []);
 
   const [cycle, setCycle] = useState(() => initialRhythmState.cycle);
   const [bpm, setBpm] = useState(() => initialRhythmState.bpm);
@@ -431,6 +424,11 @@ export default function TombakRhythmBuilder() {
   const eventIdxRef = useRef(0);
   const rafRef = useRef(null);
   const isPlayingRef = useRef(false);
+  const lastSavedPayloadRef = useRef(JSON.stringify({
+    cycle: initialRhythmState.cycle,
+    bpm: initialRhythmState.bpm,
+    accentDownbeats: initialRhythmState.accentDownbeats,
+  }));
   const eventsRef = useRef(buildEventList(cycle));
 
   useEffect(() => { eventsRef.current = buildEventList(cycle); }, [cycle]);
@@ -439,7 +437,10 @@ export default function TombakRhythmBuilder() {
   useEffect(() => { setBpmInput(String(bpm)); }, [bpm]);
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      saveRhythmState({ cycle, bpm, accentDownbeats });
+      const payload = JSON.stringify({ cycle, bpm, accentDownbeats });
+      if (payload === lastSavedPayloadRef.current) return;
+      lastSavedPayloadRef.current = payload;
+      saveRhythmState(payload);
     }, PERSISTENCE_DEBOUNCE_MS);
     return () => clearTimeout(timeoutId);
   }, [cycle, bpm, accentDownbeats]);
