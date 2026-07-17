@@ -104,12 +104,13 @@ const TIME_SIGS = {
   "10/8":{ beats:10, groups: [[3,3,2,2],[3,2,3,2],[2,3,3,2]] },
   "12/8":{ beats:12, groups: [[3,3,3,3]] },
 };
-const PERSISTENCE_KEY = "tombak-rhythm-builder:last-rhythm-v1";
+const LOCAL_STORAGE_KEY = "tombak-rhythm-builder:last-rhythm-v1";
 const PERSISTENCE_DEBOUNCE_MS = 150;
+const DEFAULT_STROKE_TYPE = "tom";
 
-function makeStroke(type="tom", accent=false) { return { type, accent }; }
+function makeStroke(type=DEFAULT_STROKE_TYPE, accent=false) { return { type, accent }; }
 function makeBeat(subs=1) {
-  return { subdivisions: subs, strokes: Array.from({length:subs}, () => makeStroke("tom")) };
+  return { subdivisions: subs, strokes: Array.from({length:subs}, () => makeStroke(DEFAULT_STROKE_TYPE)) };
 }
 function makeMeasure(timeSig="4/4", groupIdx=0) {
   const { beats } = TIME_SIGS[timeSig];
@@ -131,7 +132,7 @@ function clampInt(value, min, max, fallback) {
 }
 
 function normalizeStroke(rawStroke) {
-  const type = STROKE_CYCLE.includes(rawStroke?.type) ? rawStroke.type : "tom";
+  const type = STROKE_CYCLE.includes(rawStroke?.type) ? rawStroke.type : DEFAULT_STROKE_TYPE;
   return { type, accent: Boolean(rawStroke?.accent) };
 }
 
@@ -143,7 +144,7 @@ function normalizeBeat(rawBeat) {
 }
 
 function normalizeMeasure(rawMeasure) {
-  const timeSig = Object.prototype.hasOwnProperty.call(TIME_SIGS, rawMeasure?.timeSig) ? rawMeasure.timeSig : "4/4";
+  const timeSig = rawMeasure?.timeSig in TIME_SIGS ? rawMeasure.timeSig : "4/4";
   const maxGroupIdx = TIME_SIGS[timeSig].groups.length - 1;
   const groupIdx = clampInt(rawMeasure?.groupIdx, 0, maxGroupIdx, 0);
   const rawBeats = Array.isArray(rawMeasure?.beats) ? rawMeasure.beats : [];
@@ -162,7 +163,7 @@ function readSavedRhythmState() {
   const fallback = { cycle: defaultCycle(), bpm: 80, accentDownbeats: true };
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(PERSISTENCE_KEY);
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return {
@@ -178,7 +179,7 @@ function readSavedRhythmState() {
 function saveRhythmState(serializedState) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(PERSISTENCE_KEY, serializedState);
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, serializedState);
   } catch {}
 }
 
@@ -424,11 +425,7 @@ export default function TombakRhythmBuilder() {
   const eventIdxRef = useRef(0);
   const rafRef = useRef(null);
   const isPlayingRef = useRef(false);
-  const lastSavedPayloadRef = useRef(JSON.stringify({
-    cycle: initialRhythmState.cycle,
-    bpm: initialRhythmState.bpm,
-    accentDownbeats: initialRhythmState.accentDownbeats,
-  }));
+  const lastSavedPayloadRef = useRef(null);
   const eventsRef = useRef(buildEventList(cycle));
 
   useEffect(() => { eventsRef.current = buildEventList(cycle); }, [cycle]);
@@ -438,6 +435,10 @@ export default function TombakRhythmBuilder() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       const payload = JSON.stringify({ cycle, bpm, accentDownbeats });
+      if (lastSavedPayloadRef.current === null) {
+        lastSavedPayloadRef.current = payload;
+        return;
+      }
       if (payload === lastSavedPayloadRef.current) return;
       lastSavedPayloadRef.current = payload;
       saveRhythmState(payload);
