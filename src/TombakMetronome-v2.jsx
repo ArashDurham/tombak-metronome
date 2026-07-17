@@ -657,12 +657,7 @@ export default function TombakRhythmBuilder() {
           <button
             onClick={resetToDefault}
             title="Reset to default pattern"
-            style={{
-              padding:"6px 14px", borderRadius:20,
-              border:"1px solid #4a2e18", background:"transparent",
-              color:"#8a6040", fontSize:11, cursor:"pointer",
-              fontFamily:"inherit", letterSpacing:"0.08em",
-            }}
+            style={resetBtn}
           >
             Reset to Default
           </button>
@@ -764,5 +759,11 @@ const beatCtrlBtn = {
   padding:"5px 14px", borderRadius:20,
   border:"1px solid #3a2618", background:"transparent",
   color:"#8a6840", fontSize:11, cursor:"pointer",
+  fontFamily:"inherit", letterSpacing:"0.08em",
+};
+const resetBtn = {
+  padding:"6px 14px", borderRadius:20,
+  border:"1px solid #4a2e18", background:"transparent",
+  color:"#8a6040", fontSize:11, cursor:"pointer",
   fontFamily:"inherit", letterSpacing:"0.08em",
 };
