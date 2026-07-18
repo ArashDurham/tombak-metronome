@@ -3,11 +3,18 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 // ─────────────────────────────────────────────
 // AUDIO ENGINE
 // ─────────────────────────────────────────────
-// 1.8 lifts the overall level enough to hear softer strokes more clearly on
-// quieter speakers while leaving the existing per-stroke accent balance intact.
+// 1.8 is the smallest broad boost that noticeably lifts softer strokes on
+// quieter speakers without also changing the per-stroke accent ratios.
 const MASTER_GAIN_VALUE = 1.8;
 // Maps each active AudioContext to its shared master gain node/output chain.
 const outputNodeCache = new WeakMap();
+// Gentle compressor settings that tame stacked transients without flattening
+// the natural accent difference between louder and softer strokes.
+const MASTER_COMPRESSOR_THRESHOLD = -12;
+const MASTER_COMPRESSOR_KNEE = 18;
+const MASTER_COMPRESSOR_RATIO = 4;
+const MASTER_COMPRESSOR_ATTACK = 0.003;
+const MASTER_COMPRESSOR_RELEASE = 0.12;
 
 function makeAudioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -22,11 +29,11 @@ function getAudioOutput(ctx) {
     masterGain = ctx.createGain();
     const compressor = ctx.createDynamicsCompressor();
     masterGain.gain.value = MASTER_GAIN_VALUE;
-    compressor.threshold.value = -12;
-    compressor.knee.value = 18;
-    compressor.ratio.value = 4;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.12;
+    compressor.threshold.value = MASTER_COMPRESSOR_THRESHOLD;
+    compressor.knee.value = MASTER_COMPRESSOR_KNEE;
+    compressor.ratio.value = MASTER_COMPRESSOR_RATIO;
+    compressor.attack.value = MASTER_COMPRESSOR_ATTACK;
+    compressor.release.value = MASTER_COMPRESSOR_RELEASE;
     masterGain.connect(compressor);
     compressor.connect(ctx.destination);
     outputNodeCache.set(ctx, masterGain);
