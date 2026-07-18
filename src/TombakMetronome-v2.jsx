@@ -3,8 +3,10 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 // ─────────────────────────────────────────────
 // AUDIO ENGINE
 // ─────────────────────────────────────────────
+// Tuned to make strokes comfortably audible on quieter speakers without pushing
+// the per-stroke envelopes harder, which helps preserve accent balance.
 const MASTER_GAIN_VALUE = 1.8;
-const masterGainNodes = new WeakMap();
+const masterGainNodeCache = new WeakMap();
 
 function makeAudioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -12,12 +14,12 @@ function makeAudioCtx() {
 }
 
 function getAudioOutput(ctx) {
-  let masterGain = masterGainNodes.get(ctx);
+  let masterGain = masterGainNodeCache.get(ctx);
   if (!masterGain) {
     masterGain = ctx.createGain();
     masterGain.gain.value = MASTER_GAIN_VALUE;
     masterGain.connect(ctx.destination);
-    masterGainNodes.set(ctx, masterGain);
+    masterGainNodeCache.set(ctx, masterGain);
   }
   return masterGain;
 }
