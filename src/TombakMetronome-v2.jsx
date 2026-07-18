@@ -3,9 +3,23 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 // ─────────────────────────────────────────────
 // AUDIO ENGINE
 // ─────────────────────────────────────────────
+const MASTER_GAIN_VALUE = 1.8;
+const masterGainNodes = new WeakMap();
+
 function makeAudioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   return new Ctx();
+}
+
+function getAudioOutput(ctx) {
+  let masterGain = masterGainNodes.get(ctx);
+  if (!masterGain) {
+    masterGain = ctx.createGain();
+    masterGain.gain.value = MASTER_GAIN_VALUE;
+    masterGain.connect(ctx.destination);
+    masterGainNodes.set(ctx, masterGain);
+  }
+  return masterGain;
 }
 
 function playTom(ctx, t, g = 1) {
@@ -16,14 +30,14 @@ function playTom(ctx, t, g = 1) {
   gain.gain.setValueAtTime(0.001, t);
   gain.gain.exponentialRampToValueAtTime(0.9 * g, t + 0.004);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-  osc.connect(gain); gain.connect(ctx.destination);
+  osc.connect(gain); gain.connect(getAudioOutput(ctx));
   osc.start(t); osc.stop(t + 0.35);
   const o2 = ctx.createOscillator(), g2 = ctx.createGain();
   o2.type = "triangle"; o2.frequency.setValueAtTime(95, t);
   g2.gain.setValueAtTime(0.001, t);
   g2.gain.exponentialRampToValueAtTime(0.25 * g, t + 0.005);
   g2.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-  o2.connect(g2); g2.connect(ctx.destination);
+  o2.connect(g2); g2.connect(getAudioOutput(ctx));
   o2.start(t); o2.stop(t + 0.22);
 }
 
@@ -37,13 +51,13 @@ function playBak(ctx, t, g = 1) {
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.7*g, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t+0.07);
-  src.connect(hp); hp.connect(gain); gain.connect(ctx.destination);
+  src.connect(hp); hp.connect(gain); gain.connect(getAudioOutput(ctx));
   src.start(t); src.stop(t+0.08);
   const osc = ctx.createOscillator(), og = ctx.createGain();
   osc.type = "square"; osc.frequency.setValueAtTime(2200, t);
   og.gain.setValueAtTime(0.08*g, t);
   og.gain.exponentialRampToValueAtTime(0.001, t+0.02);
-  osc.connect(og); og.connect(ctx.destination);
+  osc.connect(og); og.connect(getAudioOutput(ctx));
   osc.start(t); osc.stop(t+0.025);
 }
 
@@ -57,7 +71,7 @@ function playPelang(ctx, t, g = 1) {
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.55*g, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t+0.06);
-  src.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
+  src.connect(bp); bp.connect(gain); gain.connect(getAudioOutput(ctx));
   src.start(t); src.stop(t+0.07);
 }
 
@@ -71,7 +85,7 @@ function playHaft(ctx, t, g = 1) {
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.38*g, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t+0.045);
-  src.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
+  src.connect(bp); bp.connect(gain); gain.connect(getAudioOutput(ctx));
   src.start(t); src.stop(t+0.05);
 }
 
