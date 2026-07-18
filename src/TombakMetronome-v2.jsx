@@ -4,9 +4,10 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 // AUDIO ENGINE
 // ─────────────────────────────────────────────
 // Tuned to make strokes comfortably audible on quieter speakers without pushing
-// the per-stroke envelopes harder, which helps preserve accent balance.
+// the per-stroke envelopes harder, and paired with gentle compression so
+// overlapping transients stay cleaner at higher playback levels.
 const MASTER_GAIN_VALUE = 1.8;
-const masterGainNodeCache = new WeakMap();
+const outputNodeCache = new WeakMap();
 
 function makeAudioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -14,12 +15,21 @@ function makeAudioCtx() {
 }
 
 function getAudioOutput(ctx) {
-  let masterGain = masterGainNodeCache.get(ctx);
+  // The component owns each AudioContext for its full lifetime, so one cached
+  // output chain per active context is sufficient.
+  let masterGain = outputNodeCache.get(ctx);
   if (!masterGain) {
     masterGain = ctx.createGain();
+    const compressor = ctx.createDynamicsCompressor();
     masterGain.gain.value = MASTER_GAIN_VALUE;
-    masterGain.connect(ctx.destination);
-    masterGainNodeCache.set(ctx, masterGain);
+    compressor.threshold.value = -12;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.12;
+    masterGain.connect(compressor);
+    compressor.connect(ctx.destination);
+    outputNodeCache.set(ctx, masterGain);
   }
   return masterGain;
 }
