@@ -3,10 +3,10 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 // ─────────────────────────────────────────────
 // AUDIO ENGINE
 // ─────────────────────────────────────────────
-// Tuned to make strokes comfortably audible on quieter speakers without pushing
-// the per-stroke envelopes harder, and paired with gentle compression so
-// overlapping transients stay cleaner at higher playback levels.
+// 1.8 lifts the overall level enough to hear softer strokes more clearly on
+// quieter speakers while leaving the existing per-stroke accent balance intact.
 const MASTER_GAIN_VALUE = 1.8;
+// Maps each active AudioContext to its shared master gain node/output chain.
 const outputNodeCache = new WeakMap();
 
 function makeAudioCtx() {
