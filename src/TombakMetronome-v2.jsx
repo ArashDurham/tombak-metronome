@@ -128,11 +128,12 @@ const STROKE_TEXT   = { tom:"#fff8ef", bak:"#1a130a", pelang:"#fff", haft:"#fff"
 
 // Time signatures with beat groupings for Persian music
 const TIME_SIGS = {
-  "4/4": { beats: 4, groups: [[4]] },
+  "2/4": { beats: 2, groups: [[2]] },
   "3/4": { beats: 3, groups: [[3]] },
+  "4/4": { beats: 4, groups: [[4]] },
+  "5/8": { beats: 5, groups: [[2,3],[3,2]] },
   "6/8": { beats: 6, groups: [[3,3]] },
   "7/8": { beats: 7, groups: [[2,2,3],[2,3,2],[3,2,2]] },
-  "5/8": { beats: 5, groups: [[2,3],[3,2]] },
   "8/8": { beats: 8, groups: [[3,3,2],[3,2,3],[2,3,3]] },
   "10/8":{ beats:10, groups: [[3,3,2,2],[3,2,3,2],[2,3,3,2]] },
   "12/8":{ beats:12, groups: [[3,3,3,3]] },
@@ -147,7 +148,7 @@ function makeStroke(type=DEFAULT_STROKE_TYPE, accent=false) { return { type, acc
 function makeBeat(subs=1) {
   return { subdivisions: subs, strokes: Array.from({length:subs}, () => makeStroke(DEFAULT_STROKE_TYPE)) };
 }
-function makeMeasure(timeSig="4/4", groupIdx=0) {
+function makeMeasure(timeSig="2/4", groupIdx=0) {
   const { beats } = TIME_SIGS[timeSig];
   return {
     timeSig,
@@ -156,7 +157,7 @@ function makeMeasure(timeSig="4/4", groupIdx=0) {
   };
 }
 function defaultCycle() {
-  return [makeMeasure("4/4"), makeMeasure("4/4")];
+  return [makeMeasure("2/4"), makeMeasure("2/4")];
 }
 
 function clampInt(value, min, max, fallback) {
@@ -179,7 +180,7 @@ function normalizeBeat(rawBeat) {
 }
 
 function normalizeMeasure(rawMeasure) {
-  const timeSig = rawMeasure?.timeSig in TIME_SIGS ? rawMeasure.timeSig : "4/4";
+  const timeSig = rawMeasure?.timeSig in TIME_SIGS ? rawMeasure.timeSig : "2/4";
   const maxGroupIdx = TIME_SIGS[timeSig].groups.length - 1;
   const groupIdx = clampInt(rawMeasure?.groupIdx, 0, maxGroupIdx, 0);
   const rawBeats = Array.isArray(rawMeasure?.beats) ? rawMeasure.beats : [];
@@ -539,7 +540,7 @@ export default function TombakRhythmBuilder() {
   useEffect(() => () => { stop(); audioCtxRef.current?.close(); }, []);
 
   // ── Cycle mutations ──
-  const addMeasure = () => setCycle(c => [...c, makeMeasure("4/4")]);
+  const addMeasure = () => setCycle(c => [...c, makeMeasure("2/4")]);
   const removeMeasure = mIdx => setCycle(c => c.filter((_,i) => i !== mIdx));
 
   const setTimeSig = (mIdx, sig) => setCycle(c => c.map((m,i) => {
